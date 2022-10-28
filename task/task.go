@@ -134,7 +134,7 @@ func parseContent(body []byte) string {
 		return ""
 	}
 
-	return strings.ReplaceAll(strings.ReplaceAll(document.Not("script").Text(), "\n", ""), "\t", "")
+	return strings.ReplaceAll(strings.ReplaceAll(document.ReplaceWith("style").ReplaceWith("script").Text(), "\n", ""), "\t", "")
 }
 
 func parseDomain(url string) string {
