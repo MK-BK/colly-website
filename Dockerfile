@@ -1,7 +1,7 @@
 FROM ubuntu:focal
 
-COPY colly /usr/bin
+COPY colly-website /usr/bin
 
 EXPOSE 10086
 
-ENTRYPOINT [ "colly" ]
+ENTRYPOINT [ "colly-website" ]

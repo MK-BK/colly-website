@@ -1,56 +1,31 @@
 package models
 
-import (
-	"database/sql/driver"
-	"encoding/json"
-	"errors"
-	"fmt"
-
-	"gorm.io/gorm"
-)
-
 const (
 	TaskURL     = 0
 	TaskContent = 1
 )
 
 const (
-	StatsuCreate   = "create"
-	StatsuRunning  = "running"
+	StatsuCreate   = "Create"
+	StatsuRunning  = "Running"
 	StatsuFailed   = "Failed"
-	StatsuComplete = "complete"
+	StatsuComplete = "Complete"
 )
 
 type Task struct {
-	gorm.Model
+	ID   string `json:"id"`
 	URL  string `json:"url"`
 	Type int    `json:"type"`
 }
 
 type TaskResult struct {
-	gorm.Model
-	TaskID   uint        `json:"task_id"`
-	TaskType int         `json:"task_type"`
-	Data     ResultDatas `gorm:"TYPE:json"`
-	Status   string      `json:"status"`
+	TaskID   string       `json:"task_id"`
+	TaskType int          `json:"task_type"`
+	Data     []ResultData `gorm:"TYPE:json"`
+	Status   string       `json:"status"`
 }
 
 type ResultData struct {
 	URL     string `json:"url"`
 	Content string `json:"content"` //type为0时此字段为空，1时此字段保存页面文本内容
-}
-
-type ResultDatas []ResultData
-
-func (r *ResultDatas) Scan(value interface{}) error {
-	bytes, ok := value.([]byte)
-	if !ok {
-		return errors.New(fmt.Sprint("Failed to unmarshal JSONB value:", value))
-	}
-
-	return json.Unmarshal(bytes, r)
-}
-
-func (r ResultDatas) Value() (driver.Value, error) {
-	return json.Marshal(r)
 }

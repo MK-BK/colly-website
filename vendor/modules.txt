@@ -33,9 +33,6 @@ github.com/go-playground/universal-translator
 # github.com/go-playground/validator/v10 v10.10.0
 ## explicit; go 1.13
 github.com/go-playground/validator/v10
-# github.com/go-sql-driver/mysql v1.6.0
-## explicit; go 1.10
-github.com/go-sql-driver/mysql
 # github.com/gobwas/glob v0.2.3
 ## explicit
 github.com/gobwas/glob
@@ -68,12 +65,9 @@ github.com/golang/groupcache/lru
 # github.com/golang/protobuf v1.5.0
 ## explicit; go 1.9
 github.com/golang/protobuf/proto
-# github.com/jinzhu/inflection v1.0.0
+# github.com/google/uuid v1.3.0
 ## explicit
-github.com/jinzhu/inflection
-# github.com/jinzhu/now v1.1.5
-## explicit; go 1.12
-github.com/jinzhu/now
+github.com/google/uuid
 # github.com/json-iterator/go v1.1.12
 ## explicit; go 1.12
 github.com/json-iterator/go
@@ -92,6 +86,9 @@ github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v1.0.2
 ## explicit; go 1.12
 github.com/modern-go/reflect2
+# github.com/patrickmn/go-cache v2.1.0+incompatible
+## explicit
+github.com/patrickmn/go-cache
 # github.com/pelletier/go-toml/v2 v2.0.1
 ## explicit; go 1.16
 github.com/pelletier/go-toml/v2
@@ -193,15 +190,3 @@ google.golang.org/protobuf/types/descriptorpb
 # gopkg.in/yaml.v2 v2.4.0
 ## explicit; go 1.15
 gopkg.in/yaml.v2
-# gorm.io/driver/mysql v1.4.3
-## explicit; go 1.14
-gorm.io/driver/mysql
-# gorm.io/gorm v1.24.0
-## explicit; go 1.16
-gorm.io/gorm
-gorm.io/gorm/callbacks
-gorm.io/gorm/clause
-gorm.io/gorm/logger
-gorm.io/gorm/migrator
-gorm.io/gorm/schema
-gorm.io/gorm/utils

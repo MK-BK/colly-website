@@ -540,6 +540,8 @@ func (c *Collector) scrape(u, method string, depth int, requestData io.Reader, c
 	if err != nil {
 		return err
 	}
+
+	// checkRevisit true
 	if err := c.requestCheck(u, parsedURL, method, requestData, depth, checkRevisit); err != nil {
 		return err
 	}

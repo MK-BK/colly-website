@@ -1,7 +1,0 @@
-{
-    "listen": "10086",
-	"mysql_name":"root",
-	"mysql_password": "m!a0yUn",
-    "mysql_port": "13306",
-    "db_name": "myops"
-}

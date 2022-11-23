@@ -3,63 +3,42 @@ package task
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"errors"
+	"net/http"
 	"strings"
+	"time"
 
-	"colly-website/db"
 	"colly-website/models"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
+
+	"github.com/patrickmn/go-cache"
 )
 
-var (
-	log             = logrus.New()
-	defaultTaskSize = 20
-)
+var log = logrus.New()
+var concurrency = 100
 
 type TaskManager struct {
-	chs chan *models.Task
+	chs   chan *models.Task
+	Cache *cache.Cache
 }
 
-func (t *TaskManager) Create(ctx context.Context, task *models.Task) error {
-	if err := db.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Save(task).Error; err != nil {
-			return err
-		}
-
-		result := &models.TaskResult{
-			TaskID:   task.ID,
-			TaskType: task.Type,
-			Data:     make([]models.ResultData, 0),
-			Status:   models.StatsuCreate,
-		}
-
-		if err := tx.Save(result).Error; err != nil {
-			return err
-		}
-
-		return nil
-	}); err != nil {
-		return err
+func NewTaskManager() *TaskManager {
+	m := &TaskManager{
+		chs:   make(chan *models.Task, concurrency),
+		Cache: cache.New(30*time.Minute, 30*time.Minute),
 	}
 
-	t.chs <- task
-	return nil
-}
-
-func (t *TaskManager) Get(ctx context.Context, taskID uint) (*models.TaskResult, error) {
-	result := models.TaskResult{}
-	if err := db.DB.First(&result, taskID).Error; err != nil {
-		return nil, err
-	}
-
-	return &result, nil
+	m.Init()
+	return m
 }
 
 func (t *TaskManager) Init() {
-	for i := 0; i < defaultTaskSize; i++ {
+	for i := 0; i < concurrency; i++ {
 		go func() {
 			for {
 				task, ok := <-t.chs
@@ -67,65 +46,79 @@ func (t *TaskManager) Init() {
 					return
 				}
 
-				result, err := t.Get(context.Background(), task.ID)
-				if err != nil {
-					continue
+				result := &models.TaskResult{
+					TaskID:   task.ID,
+					TaskType: task.Type,
+					Status:   models.StatsuRunning,
+					Data:     make([]models.ResultData, 0),
 				}
 
-				// update result.Status -> ‘running’
-				log.Info("update task status -> running!")
-				if err := db.DB.Model(result).Update("status", models.StatsuRunning).Error; err != nil {
-					log.Error(err)
-					continue
-				}
+				t.Cache.SetDefault(task.ID, result)
 
 				c := colly.NewCollector(
-					colly.AllowedDomains(parseDomain(task.URL)),
-					colly.MaxDepth(1),
+					colly.ParseHTTPErrorResponse(),
 				)
 
-				c.OnResponse(func(resp *colly.Response) {
-					url := resp.Request.URL.String()
+				rule := &colly.LimitRule{
+					RandomDelay: time.Second,
+					Parallelism: 10,
+				}
 
-					if task.Type == models.TaskURL {
-						result.Data = append(result.Data, models.ResultData{
-							URL: url,
-						})
-					} else {
-						result.Data = append(result.Data, models.ResultData{
-							URL:     url,
-							Content: parseContent(resp.Body),
-						})
+				c.Limit(rule)
+
+				c.SetClient(&http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{
+							InsecureSkipVerify: true,
+						},
+					},
+				})
+
+				c.OnResponse(func(resp *colly.Response) {
+					if resp.StatusCode != http.StatusOK {
+						return
+					}
+
+					if strings.HasPrefix(resp.Request.URL.String(), task.URL) && strings.Index(resp.Headers.Get("Content-Type"), "text/html") > -1 {
+						if task.Type == models.TaskURL {
+							result.Data = append(result.Data, models.ResultData{
+								URL: resp.Request.URL.String(),
+							})
+						} else {
+							result.Data = append(result.Data, models.ResultData{
+								URL:     resp.Request.URL.String(),
+								Content: parseContent(resp.Body),
+							})
+						}
 					}
 				})
 
 				c.OnHTML("a", func(e *colly.HTMLElement) {
-					c.Visit(e.Attr("href"))
+					href := e.Attr("href")
+
+					if strings.HasPrefix(href, task.URL) {
+						c.Visit(href)
+					} else if strings.HasPrefix(href, "/") && !strings.HasPrefix(href, "//") {
+						c.Visit(task.URL + href)
+					}
 				})
 
+				c.OnError(func(resp *colly.Response, err error) {
+					log.Error("OnError:", err)
+				})
+
+				start := time.Now()
+
+				log.Infof("%+v: start to visit URL: %s", start, task.URL)
 				c.Visit(task.URL)
 
-				log.Info("update task status -> conplete && data!")
-				if err := db.DB.Debug().Model(&result).Updates(models.TaskResult{
-					Status: models.StatsuComplete,
-					Data:   result.Data,
-				}).Error; err != nil {
-					log.Error(err)
-					continue
-				}
+				log.Infof("Colly Visit complete, %+v, spend: %+v", task.ID, time.Now().Sub(start))
 
+				result.Status = models.StatsuComplete
+				t.Cache.SetDefault(task.ID, result)
 			}
 		}()
 	}
-}
-
-func NewTaskManager() *TaskManager {
-	m := &TaskManager{
-		chs: make(chan *models.Task, defaultTaskSize),
-	}
-
-	m.Init()
-	return m
 }
 
 func parseContent(body []byte) string {
@@ -134,13 +127,44 @@ func parseContent(body []byte) string {
 		return ""
 	}
 
-	return strings.ReplaceAll(strings.ReplaceAll(document.ReplaceWith("style").ReplaceWith("script").Text(), "\n", ""), "\t", "")
+	text := document.ReplaceWithSelection(document.Find("style")).ReplaceWithSelection(document.Find("script")).Text()
+
+	return strings.Join(strings.Fields(strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(text, "\n", ""), "\t", ""))), "")
 }
 
-func parseDomain(url string) string {
-	arrs := strings.Split(url, "://")
-	if len(arrs) > 0 {
-		return arrs[1]
+func (t *TaskManager) Create(ctx context.Context, task *models.Task) error {
+	task.ID = uuid.New().String()
+
+	result := &models.TaskResult{
+		TaskID:   task.ID,
+		TaskType: task.Type,
+		Data:     make([]models.ResultData, 0),
+		Status:   models.StatsuCreate,
 	}
-	return ""
+
+	t.Cache.SetDefault(result.TaskID, result)
+	t.chs <- task
+
+	return nil
+}
+
+func (t *TaskManager) Get(ctx context.Context, taskID string) (*models.TaskResult, error) {
+	v, ok := t.Cache.Get(taskID)
+	if !ok {
+		return nil, errors.New("result not found")
+	}
+
+	if result, ok := v.(*models.TaskResult); ok {
+		if result.Status == models.StatsuComplete {
+			return result, nil
+		}
+
+		return &models.TaskResult{
+			TaskID:   result.TaskID,
+			TaskType: result.TaskType,
+			Status:   result.Status,
+		}, nil
+	}
+
+	return nil, errors.New("result not found")
 }

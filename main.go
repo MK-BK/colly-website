@@ -1,46 +1,20 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"net/http"
-	"strconv"
 
-	"colly-website/db"
 	"colly-website/models"
 	"colly-website/task"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 )
 
-var (
-	conf        = &models.Config{}
-	log         = logrus.New()
-	taskManager *task.TaskManager
-)
+var taskManager *task.TaskManager
 
 func main() {
-	if err := loadConfig("config.json"); err != nil {
-		panic(err)
-	}
-
-	if err := db.InitDB(conf); err != nil {
-		panic(err)
-	}
-
 	taskManager = task.NewTaskManager()
 	startServer()
-}
-
-func loadConfig(path string) error {
-	b, err := ioutil.ReadFile(path)
-	if err != nil {
-		return err
-	}
-
-	return json.Unmarshal(b, conf)
 }
 
 func startServer() {
@@ -49,8 +23,8 @@ func startServer() {
 	e.GET("/:id", getTask)
 	e.POST("/", createTask)
 
-	if err := http.ListenAndServe(":"+conf.Listen, e); err != nil {
-		log.Fatal(err)
+	if err := http.ListenAndServe(":10086", e); err != nil {
+		panic(err)
 	}
 }
 
@@ -76,8 +50,7 @@ func getTask(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusBadRequest, errors.New("param id must empty"))
 	}
 
-	taskID, err := strconv.Atoi(id)
-	result, err := taskManager.Get(ctx.Request.Context(), uint(taskID))
+	result, err := taskManager.Get(ctx.Request.Context(), id)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 	}
