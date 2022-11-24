@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
 
 	"colly-website/models"
 	"colly-website/task"
@@ -50,9 +53,20 @@ func getTask(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusBadRequest, errors.New("param id must empty"))
 	}
 
-	result, err := taskManager.Get(ctx.Request.Context(), id)
+	result, err := taskManager.Get(ctx, id)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
+	}
+
+	f, err := os.OpenFile("/home/len/go/src/colly-website/log.txt", os.O_APPEND|os.O_RDWR, 0664)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	b, _ := json.Marshal(result)
+	_, err = f.Write(b)
+	if err != nil {
+		fmt.Println(err)
 	}
 
 	ctx.JSON(http.StatusOK, result)

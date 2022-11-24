@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -55,7 +56,17 @@ func (t *TaskManager) Init() {
 
 				t.Cache.SetDefault(task.ID, result)
 
+				URL, err := url.Parse(task.URL)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+
+				log.Warn(URL.Host)
+
 				c := colly.NewCollector(
+					colly.AllowedDomains(URL.Host),
+					colly.Async(true),
 					colly.ParseHTTPErrorResponse(),
 				)
 
@@ -94,24 +105,24 @@ func (t *TaskManager) Init() {
 				})
 
 				c.OnHTML("a", func(e *colly.HTMLElement) {
-					href := e.Attr("href")
-
-					if strings.HasPrefix(href, task.URL) {
-						c.Visit(href)
-					} else if strings.HasPrefix(href, "/") && !strings.HasPrefix(href, "//") {
-						c.Visit(task.URL + href)
-					}
+					link := e.Attr("href")
+					c.Visit(e.Request.AbsoluteURL(link))
+					// if strings.HasPrefix(href, task.URL) {
+					// 	c.Visit(href)
+					// } else if strings.HasPrefix(href, "/") && !strings.HasPrefix(href, "//") {
+					// 	c.Visit(task.URL + href)
+					// }
 				})
 
 				c.OnError(func(resp *colly.Response, err error) {
 					log.Error("OnError:", err)
 				})
-
 				start := time.Now()
 
 				log.Infof("%+v: start to visit URL: %s", start, task.URL)
 				c.Visit(task.URL)
 
+				c.Wait()
 				log.Infof("Colly Visit complete, %+v, spend: %+v", task.ID, time.Now().Sub(start))
 
 				result.Status = models.StatsuComplete
@@ -127,9 +138,15 @@ func parseContent(body []byte) string {
 		return ""
 	}
 
-	text := document.ReplaceWithSelection(document.Find("style")).ReplaceWithSelection(document.Find("script")).Text()
+	text := make([]string, 0)
+	document.Find("div").Each(func(i int, s *goquery.Selection) {
+		s.ReplaceWithSelection(s.Find("script")).ReplaceWithSelection(s.Find("style")).ReplaceWithSelection(s.Find("textarea")).ReplaceWithSelection(s.Find("noscript")).Each(func(i int, s *goquery.Selection) {
+			txt := s.Text()
+			text = append(text, strings.Join(strings.Fields(strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(txt, "\n", ""), "\t", ""))), ""))
+		})
+	})
 
-	return strings.Join(strings.Fields(strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(text, "\n", ""), "\t", ""))), "")
+	return strings.Join(text, "")
 }
 
 func (t *TaskManager) Create(ctx context.Context, task *models.Task) error {
