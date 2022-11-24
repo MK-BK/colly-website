@@ -65,14 +65,15 @@ func (t *TaskManager) Init() {
 				log.Warn(URL.Host)
 
 				c := colly.NewCollector(
+					colly.MaxDepth(1),
 					colly.AllowedDomains(URL.Host),
 					colly.Async(true),
 					colly.ParseHTTPErrorResponse(),
 				)
 
 				rule := &colly.LimitRule{
-					RandomDelay: time.Second,
-					Parallelism: 10,
+					RandomDelay: time.Millisecond,
+					Parallelism: 50,
 				}
 
 				c.Limit(rule)
@@ -106,12 +107,12 @@ func (t *TaskManager) Init() {
 
 				c.OnHTML("a", func(e *colly.HTMLElement) {
 					link := e.Attr("href")
-					c.Visit(e.Request.AbsoluteURL(link))
-					// if strings.HasPrefix(href, task.URL) {
-					// 	c.Visit(href)
-					// } else if strings.HasPrefix(href, "/") && !strings.HasPrefix(href, "//") {
-					// 	c.Visit(task.URL + href)
-					// }
+
+					if strings.HasSuffix(link, "html") {
+						if e.Request.Depth <= 1 {
+							c.Visit(e.Request.AbsoluteURL(link))
+						}
+					}
 				})
 
 				c.OnError(func(resp *colly.Response, err error) {
@@ -138,15 +139,12 @@ func parseContent(body []byte) string {
 		return ""
 	}
 
-	text := make([]string, 0)
-	document.Find("div").Each(func(i int, s *goquery.Selection) {
-		s.ReplaceWithSelection(s.Find("script")).ReplaceWithSelection(s.Find("style")).ReplaceWithSelection(s.Find("textarea")).ReplaceWithSelection(s.Find("noscript")).Each(func(i int, s *goquery.Selection) {
-			txt := s.Text()
-			text = append(text, strings.Join(strings.Fields(strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(txt, "\n", ""), "\t", ""))), ""))
-		})
-	})
+	text := document.ReplaceWithSelection(document.Find("script")).
+		ReplaceWithSelection(document.Find("style")).
+		ReplaceWithSelection(document.Find("textarea")).
+		ReplaceWithSelection(document.Find("noscript")).Text()
 
-	return strings.Join(text, "")
+	return strings.Join(strings.Fields(strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(text, "\n", ""), "\t", ""))), "")
 }
 
 func (t *TaskManager) Create(ctx context.Context, task *models.Task) error {

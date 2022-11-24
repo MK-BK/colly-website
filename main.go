@@ -1,11 +1,8 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
-	"os"
 
 	"colly-website/models"
 	"colly-website/task"
@@ -58,16 +55,22 @@ func getTask(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 	}
 
-	f, err := os.OpenFile("/home/len/go/src/colly-website/log.txt", os.O_APPEND|os.O_RDWR, 0664)
-	if err != nil {
-		fmt.Println(err)
-	}
+	// f, err := os.OpenFile("/Users/len/go/src/colly-website/log.txt", os.O_APPEND|os.O_RDWR, 0664)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
 
-	b, _ := json.Marshal(result)
-	_, err = f.Write(b)
-	if err != nil {
-		fmt.Println(err)
-	}
+	// b, _ := json.Marshal(result)
+	// _, err = f.Write(b)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+
+	// ctx.Writer.WriteHeader(http.StatusOK)
+	// ctx.Header("Content-Disposition", "attachment; filename=a.tar")
+	// ctx.Header("Content-Type", "application/octet-stream")
+	// ctx.Header("Content-Length", fmt.Sprintf("%d", len(b)))
+	// ctx.Writer.Write(b) //the memory take up 1.2~1.7G
 
 	ctx.JSON(http.StatusOK, result)
 }
