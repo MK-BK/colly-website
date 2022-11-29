@@ -108,16 +108,16 @@ func (t *TaskManager) Init() {
 				c.OnHTML("a", func(e *colly.HTMLElement) {
 					link := e.Attr("href")
 
-					if strings.HasSuffix(link, "html") {
-						if e.Request.Depth <= 1 {
-							c.Visit(e.Request.AbsoluteURL(link))
-						}
+					// if strings.HasSuffix(link, "html") {
+					if e.Request.Depth <= 1 {
+						c.Visit(e.Request.AbsoluteURL(link))
 					}
+					// }
 				})
 
-				c.OnError(func(resp *colly.Response, err error) {
-					log.Error("OnError:", err)
-				})
+				// c.OnError(func(resp *colly.Response, err error) {
+				// 	log.Error("OnError:", err)
+				// })
 				start := time.Now()
 
 				log.Infof("%+v: start to visit URL: %s", start, task.URL)

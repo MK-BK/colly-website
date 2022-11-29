@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"colly-website/models"
@@ -60,17 +62,17 @@ func getTask(ctx *gin.Context) {
 	// 	fmt.Println(err)
 	// }
 
-	// b, _ := json.Marshal(result)
+	b, _ := json.Marshal(result)
 	// _, err = f.Write(b)
 	// if err != nil {
 	// 	fmt.Println(err)
 	// }
 
-	// ctx.Writer.WriteHeader(http.StatusOK)
-	// ctx.Header("Content-Disposition", "attachment; filename=a.tar")
-	// ctx.Header("Content-Type", "application/octet-stream")
-	// ctx.Header("Content-Length", fmt.Sprintf("%d", len(b)))
-	// ctx.Writer.Write(b) //the memory take up 1.2~1.7G
+	ctx.Writer.WriteHeader(http.StatusOK)
+	ctx.Header("Content-Disposition", "attachment; filename=job.json")
+	ctx.Header("Content-Type", "application/octet-stream")
+	ctx.Header("Content-Length", fmt.Sprintf("%d", len(b)))
+	ctx.Writer.Write(b) //the memory take up 1.2~1.7G
 
-	ctx.JSON(http.StatusOK, result)
+	// ctx.JSON(http.StatusOK, result)
 }
