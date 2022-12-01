@@ -65,7 +65,7 @@ func (t *TaskManager) Init() {
 				log.Warn(URL.Host)
 
 				c := colly.NewCollector(
-					colly.MaxDepth(1),
+					colly.MaxDepth(2),
 					colly.AllowedDomains(URL.Host),
 					colly.Async(true),
 					colly.ParseHTTPErrorResponse(),
@@ -90,8 +90,7 @@ func (t *TaskManager) Init() {
 					if resp.StatusCode != http.StatusOK {
 						return
 					}
-
-					if strings.HasPrefix(resp.Request.URL.String(), task.URL) && strings.Index(resp.Headers.Get("Content-Type"), "text/html") > -1 {
+					if strings.Contains(resp.Headers.Get("Content-Type"), "html") {
 						if task.Type == models.TaskURL {
 							result.Data = append(result.Data, models.ResultData{
 								URL: resp.Request.URL.String(),
@@ -106,18 +105,10 @@ func (t *TaskManager) Init() {
 				})
 
 				c.OnHTML("a", func(e *colly.HTMLElement) {
-					link := e.Attr("href")
-
-					// if strings.HasSuffix(link, "html") {
-					if e.Request.Depth <= 1 {
-						c.Visit(e.Request.AbsoluteURL(link))
-					}
-					// }
+					href := e.Attr("href")
+					e.Request.Visit(href)
 				})
 
-				// c.OnError(func(resp *colly.Response, err error) {
-				// 	log.Error("OnError:", err)
-				// })
 				start := time.Now()
 
 				log.Infof("%+v: start to visit URL: %s", start, task.URL)
